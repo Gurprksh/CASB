@@ -1,0 +1,651 @@
+YPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cloud Access Security Broker (CASB) Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .sidebar-icon { width: 24px; height: 24px; }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #1e293b; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+        .card-glow { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border-radius: 12px; pointer-events: none; transition: opacity 0.3s ease-in-out; opacity: 0; }
+        .card:hover .card-glow { opacity: 1; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes fadeAndSlideIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        .fade-in { animation: fadeIn 0.5s ease-in-out forwards; }
+        .fade-slide-in { animation: fadeAndSlideIn 0.5s ease-in-out forwards; }
+        .table-row-animate { opacity: 0; animation: fadeIn 0.3s ease-out forwards; }
+        #toast-container { position: fixed; bottom: 2rem; right: 2rem; z-index: 100; }
+        .toast { display: flex; align-items: center; padding: 1rem 1.5rem; border-radius: 0.5rem; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); opacity: 0; transform: translateX(100%); transition: all 0.4s cubic-bezier(0.215, 0.610, 0.355, 1); }
+        .toast.show { opacity: 1; transform: translateX(0); }
+        .modal-content {
+            opacity: 0;
+            transform: translateY(-2.5rem) scale(0.95);
+            transition: all 0.3s cubic-bezier(0.215, 0.610, 0.355, 1);
+        }
+        .modal-content.show {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+        }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-300">
+
+    <!-- Overlays -->
+    <div id="connecting-overlay" class="hidden fixed inset-0 bg-slate-900 z-50 flex items-center justify-center text-center p-8">
+        <div>
+            <svg class="animate-spin mx-auto h-12 w-12 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+            <h2 class="mt-4 text-2xl font-bold text-slate-100">Connecting to Server...</h2>
+            <p class="mt-2 text-slate-400">Attempting to reach <code class="bg-slate-700 text-amber-400 px-1 py-0.5 rounded">http://localhost:3000</code>.</p>
+        </div>
+    </div>
+    <div id="connection-error-overlay" class="hidden fixed inset-0 bg-slate-900 bg-opacity-95 z-50 flex items-center justify-center p-8">
+        <div class="text-center max-w-2xl">
+            <svg class="mx-auto h-16 w-16 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+            <h2 class="mt-4 text-2xl font-bold text-slate-100">Connection Failed</h2>
+            <p class="mt-2 text-slate-400">The dashboard could not connect to the backend server. This usually happens for one of two reasons:</p>
+            <div class="mt-6 text-left grid md:grid-cols-2 gap-6">
+                <div class="bg-slate-800/50 p-4 rounded-lg border border-slate-700"><h3 class="font-semibold text-slate-100">1. The Server Isn't Running</h3><p class="mt-2 text-sm text-slate-400">Please make sure you have started the server by running the command below in your project's terminal.</p><pre class="mt-2 bg-slate-900 text-slate-200 p-2 rounded text-sm"><code>npm start</code></pre></div>
+                <div class="bg-slate-800/50 p-4 rounded-lg border border-slate-700"><h3 class="font-semibold text-slate-100">2. You Opened This File Directly</h3><p class="mt-2 text-sm text-slate-400">For security, browsers often block local files. You must access the app through the server's address after starting it.</p><a href="http://localhost:3000" class="mt-3 inline-block w-full text-center bg-blue-600 text-white font-semibold px-4 py-2 rounded-md hover:bg-blue-700 transition-colors">Go to http://localhost:3000</a></div>
+            </div>
+             <button onclick="retryConnection()" class="mt-6 text-sm text-slate-400 hover:text-slate-200 underline">Or click here to try connecting again</button>
+        </div>
+    </div>
+     <div id="add-user-modal" class="hidden fixed inset-0 bg-slate-900 bg-opacity-75 z-40 flex items-center justify-center p-4">
+        <div class="modal-content bg-slate-800 rounded-xl shadow-2xl p-8 border border-slate-700 w-full max-w-md">
+            <div class="flex justify-between items-center mb-6"><h3 class="text-xl font-bold text-slate-100">Add New User</h3><button onclick="closeModal('add-user-modal')" class="text-slate-400 hover:text-white">&times;</button></div>
+            <form id="add-user-form" class="space-y-4">
+                <div><label for="name" class="block text-sm font-medium text-slate-400">Full Name</label><input type="text" id="name" required class="mt-1 block w-full bg-slate-700 border-slate-600 rounded-md shadow-sm py-2 px-3 text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+                <div><label for="email" class="block text-sm font-medium text-slate-400">Email Address</label><input type="email" id="email" required class="mt-1 block w-full bg-slate-700 border-slate-600 rounded-md shadow-sm py-2 px-3 text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+                <div><label for="role" class="block text-sm font-medium text-slate-400">Role</label><select id="role" required class="mt-1 block w-full bg-slate-700 border-slate-600 rounded-md shadow-sm py-2 px-3 text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"><option>User</option><option>Admin</option></select></div>
+                <div class="pt-4 flex justify-end space-x-3">
+                    <button type="button" onclick="closeModal('add-user-modal')" class="bg-slate-600 text-white font-semibold px-4 py-2 rounded-md hover:bg-slate-700 transition-colors">Cancel</button>
+                    <button type="submit" class="bg-blue-600 text-white font-semibold px-4 py-2 rounded-md hover:bg-blue-700 transition-colors">Add User</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <!-- NEW Confirmation Modal -->
+    <div id="confirmation-modal" class="hidden fixed inset-0 bg-slate-900 bg-opacity-75 z-40 flex items-center justify-center p-4">
+        <div class="modal-content bg-slate-800 rounded-xl shadow-2xl p-8 border border-slate-700 w-full max-w-md">
+            <h3 id="confirm-title" class="text-xl font-bold text-slate-100 mb-4">Confirm Action</h3>
+            <p id="confirm-message" class="text-slate-400 mb-6">Are you sure you want to proceed?</p>
+            <div class="flex justify-end space-x-3">
+                <button onclick="closeModal('confirmation-modal')" class="bg-slate-600 text-white font-semibold px-4 py-2 rounded-md hover:bg-slate-700 transition-colors">Cancel</button>
+                <button id="confirm-button" class="text-white font-semibold px-4 py-2 rounded-md transition-colors">Confirm</button>
+            </div>
+        </div>
+    </div>
+    <div id="toast-container"></div>
+    
+    <div class="flex h-screen">
+        <aside class="w-64 bg-slate-900 flex flex-col fixed h-full z-10 border-r border-slate-800">
+            <div class="flex items-center justify-center h-20 border-b border-slate-800"><svg class="h-8 w-8 text-blue-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg><h1 class="text-xl font-bold text-slate-100">CASB Portal</h1></div>
+            <nav class="flex-grow mt-4">
+                <a href="#" id="nav-dashboard" class="flex items-center py-3 px-6 text-slate-300 hover:bg-slate-700/50 hover:text-white rounded-lg mx-2 transition-all duration-200 bg-blue-600/30 text-white"><svg class="sidebar-icon mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10v11h6v-7h6v7h6V10M12 2L2 12h3v11h14V12h3L12 2z"/></svg><span>Dashboard</span></a>
+                <a href="#" id="nav-shadow-it" class="flex items-center py-3 px-6 text-slate-300 hover:bg-slate-700/50 hover:text-white rounded-lg mx-2 transition-all duration-200"><svg class="sidebar-icon mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a9.97 9.97 0 01-1.563 3.029m-2.122-2.122A3 3 0 0012 15a3 3 0 00-1.022-.207m-4.134-4.134A3 3 0 0012 9a3 3 0 00.207 1.022m-1.022-.207L3 3m18 18l-3.59-3.59"/></svg><span>Shadow IT</span></a>
+                <a href="#" id="nav-dlp" class="flex items-center py-3 px-6 text-slate-300 hover:bg-slate-700/50 hover:text-white rounded-lg mx-2 transition-all duration-200"><svg class="sidebar-icon mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg><span>DLP Incidents</span></a>
+                <a href="#" id="nav-threats" class="flex items-center py-3 px-6 text-slate-300 hover:bg-slate-700/50 hover:text-white rounded-lg mx-2 transition-all duration-200"><svg class="sidebar-icon mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg><span>Threat Protection</span></a>
+                <a href="#" id="nav-policies" class="flex items-center py-3 px-6 text-slate-300 hover:bg-slate-700/50 hover:text-white rounded-lg mx-2 transition-all duration-200"><svg class="sidebar-icon mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg><span>Policies</span></a>
+                <div class="border-t border-slate-700 mx-4 mt-4 pt-4"><p class="px-4 text-sm font-semibold text-slate-500 uppercase tracking-wider">Administration</p></div>
+                <a href="#" id="nav-users" class="flex items-center py-3 px-6 text-slate-300 hover:bg-slate-700/50 hover:text-white rounded-lg mx-2 transition-all duration-200 mt-2"><svg class="sidebar-icon mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M15 21a6 6 0 00-9-5.197m0 0A4 4 0 019 10.354M12 4.354a4 4 0 010 5.292"/></svg><span>User Management</span></a>
+                <a href="#" id="nav-services" class="flex items-center py-3 px-6 text-slate-300 hover:bg-slate-700/50 hover:text-white rounded-lg mx-2 transition-all duration-200"><svg class="sidebar-icon mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg><span>Service Connectors</span></a>
+                <a href="#" id="nav-audit" class="flex items-center py-3 px-6 text-slate-300 hover:bg-slate-700/50 hover:text-white rounded-lg mx-2 transition-all duration-200"><svg class="sidebar-icon mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg><span>Audit Log</span></a>
+                <a href="#" id="nav-settings" class="flex items-center py-3 px-6 text-slate-300 hover:bg-slate-700/50 hover:text-white rounded-lg mx-2 transition-all duration-200"><svg class="sidebar-icon mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0 3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg><span>Settings</span></a>
+            </nav>
+        </aside>
+
+        <main class="ml-64 flex-1 p-8 overflow-y-auto">
+            <h1 id="page-title" class="text-3xl font-bold mb-8 text-slate-100">Dashboard</h1>
+            <div id="dashboard-view">
+                 <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-6 mb-8">
+                    <div class="bg-slate-800 p-6 rounded-xl shadow-lg border border-slate-700 flex items-center justify-between relative card fade-slide-in"><div class="card-glow" style="background:radial-gradient(circle at top left,rgba(59,130,246,0.15),transparent 50%)"></div><div><p class="text-sm text-slate-400">Discovered Apps</p><p id="discovered-apps-count" class="text-3xl font-bold text-slate-100">--</p></div><div class="bg-blue-900/50 text-blue-400 p-3 rounded-full"><svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg></div></div>
+                    <div class="bg-slate-800 p-6 rounded-xl shadow-lg border border-slate-700 flex items-center justify-between relative card fade-slide-in" style="animation-delay: 100ms;"><div class="card-glow" style="background:radial-gradient(circle at top left,rgba(239,68,68,0.15),transparent 50%)"></div><div><p class="text-sm text-slate-400">DLP Incidents (24h)</p><p id="dlp-incidents-count" class="text-3xl font-bold text-slate-100">--</p></div><div class="bg-red-900/50 text-red-400 p-3 rounded-full"><svg class="sidebar-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg></div></div>
+                    <div class="bg-slate-800 p-6 rounded-xl shadow-lg border border-slate-700 flex items-center justify-between relative card fade-slide-in" style="animation-delay: 200ms;"><div class="card-glow" style="background:radial-gradient(circle at top left,rgba(245,158,11,0.15),transparent 50%)"></div><div><p class="text-sm text-slate-400">Threats Detected</p><p id="threats-detected-count" class="text-3xl font-bold text-slate-100">--</p></div><div class="bg-amber-900/50 text-amber-400 p-3 rounded-full"><svg class="sidebar-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></div></div>
+                    <div class="bg-slate-800 p-6 rounded-xl shadow-lg border border-slate-700 flex items-center justify-between relative card fade-slide-in" style="animation-delay: 300ms;"><div class="card-glow" style="background:radial-gradient(circle at top left,rgba(34,197,94,0.15),transparent 50%)"></div><div><p class="text-sm text-slate-400">Active Policies</p><p id="active-policies-count" class="text-3xl font-bold text-slate-100">--</p></div><div class="bg-green-900/50 text-green-400 p-3 rounded-full"><svg class="sidebar-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></div></div>
+                    <div class="bg-slate-800 p-6 rounded-xl shadow-lg border border-slate-700 flex items-center justify-between relative card fade-slide-in" style="animation-delay: 400ms;"><div class="card-glow" style="background:radial-gradient(circle at top left,rgba(168,85,247,0.15),transparent 50%)"></div><div><p class="text-sm text-slate-400">Managed Users</p><p id="managed-users-count" class="text-3xl font-bold text-slate-100">--</p></div><div class="bg-purple-900/50 text-purple-400 p-3 rounded-full"><svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M15 21a6 6 0 00-9-5.197m0 0A4 4 0 019 10.354M12 4.354a4 4 0 010 5.292"/></svg></div></div>
+                    <div class="bg-slate-800 p-6 rounded-xl shadow-lg border border-slate-700 flex items-center justify-between relative card fade-slide-in" style="animation-delay: 500ms;"><div class="card-glow" style="background:radial-gradient(circle at top left,rgba(236,72,153,0.15),transparent 50%)"></div><div><p class="text-sm text-slate-400">Connected Services</p><p id="connected-services-count" class="text-3xl font-bold text-slate-100">--</p></div><div class="bg-pink-900/50 text-pink-400 p-3 rounded-full"><svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg></div></div>
+                </div>
+                <div class="grid grid-cols-1 lg:grid-cols-5 gap-6 mb-8">
+                    <div class="lg:col-span-3 bg-slate-800 p-6 rounded-xl shadow-lg border border-slate-700 fade-slide-in" style="animation-delay: 600ms;"><h3 class="font-semibold mb-4 text-slate-100">DLP Incidents by Severity</h3><canvas id="dlpChart"></canvas></div>
+                    <div class="lg:col-span-2 bg-slate-800 p-6 rounded-xl shadow-lg border border-slate-700 fade-slide-in" style="animation-delay: 700ms;"><h3 class="font-semibold mb-4 text-slate-100">App Risk Distribution</h3><canvas id="appRiskChart"></canvas></div>
+                </div>
+            </div>
+            <div id="shadow-it-view" class="hidden"><div class="bg-slate-800 p-6 rounded-xl shadow-lg border border-slate-700"><h3 class="font-semibold mb-4 text-xl text-slate-100">Discovered Cloud Applications</h3><p class="text-slate-400 mb-6">Review and manage unsanctioned applications used within your organization.</p><div class="overflow-x-auto"><table class="w-full text-left"><thead><tr class="border-b border-slate-700"><th class="p-4 font-semibold text-slate-100">Application</th><th class="p-4 font-semibold text-slate-100">Category</th><th class="p-4 font-semibold text-slate-100">Risk</th><th class="p-4 font-semibold text-slate-100">Users</th><th class="p-4 font-semibold text-slate-100">Status</th><th class="p-4 font-semibold text-center text-slate-100">Actions</th></tr></thead><tbody id="shadow-it-table"></tbody></table></div></div></div>
+            <div id="dlp-view" class="hidden"><div class="bg-slate-800 p-6 rounded-xl shadow-lg border border-slate-700"><h3 class="font-semibold mb-4 text-xl text-slate-100">Data Loss Prevention Incidents</h3><p class="text-slate-400 mb-6">Monitor and investigate incidents where sensitive data policies were violated.</p><div class="overflow-x-auto"><table class="w-full text-left"><thead><tr class="border-b border-slate-700"><th class="p-4 font-semibold text-slate-100">Timestamp</th><th class="p-4 font-semibold text-slate-100">User</th><th class="p-4 font-semibold text-slate-100">Policy Violated</th><th class="p-4 font-semibold text-slate-100">Application</th><th class="p-4 font-semibold text-slate-100">Severity</th><th class="p-4 font-semibold text-slate-100">Action Taken</th></tr></thead><tbody id="dlp-table"></tbody></table></div></div></div>
+            <div id="threats-view" class="hidden"><div class="bg-slate-800 p-6 rounded-xl shadow-lg border border-slate-700"><h3 class="font-semibold mb-4 text-xl text-slate-100">Threat Alerts</h3><p class="text-slate-400 mb-6">Analyze and respond to potential security threats detected in your cloud environment.</p><div class="overflow-x-auto"><table class="w-full text-left"><thead><tr class="border-b border-slate-700"><th class="p-4 font-semibold text-slate-100">Timestamp</th><th class="p-4 font-semibold text-slate-100">Threat Type</th><th class="p-4 font-semibold text-slate-100">User</th><th class="p-4 font-semibold text-slate-100">Source IP</th><th class="p-4 font-semibold text-slate-100">Details</th><th class="p-4 font-semibold text-slate-100">Status</th></tr></thead><tbody id="threats-table"></tbody></table></div></div></div>
+            <div id="policies-view" class="hidden"><div class="bg-slate-800 p-6 rounded-xl shadow-lg border border-slate-700"><h3 class="font-semibold mb-4 text-xl text-slate-100">Security Policies</h3><p class="text-slate-400 mb-6">Configure and manage data protection, threat, and access control policies.</p><div id="policies-list" class="space-y-4"></div></div></div>
+            <div id="settings-view" class="hidden"><div class="bg-slate-800 p-6 rounded-xl shadow-lg border border-slate-700 max-w-3xl mx-auto"><h3 class="font-semibold mb-6 text-xl text-slate-100">Settings</h3><div class="mb-8"><h4 class="text-lg font-medium text-slate-200 mb-4 border-b border-slate-700 pb-2">User Profile</h4><div class="space-y-4"><div><label class="text-sm font-medium text-slate-400">Name</label><input id="setting-user-name" type="text" disabled class="mt-1 block w-full bg-slate-700 border border-slate-600 rounded-md shadow-sm py-2 px-3 text-slate-300"></div><div><label class="text-sm font-medium text-slate-400">Email</label><input id="setting-user-email" type="email" disabled class="mt-1 block w-full bg-slate-700 border border-slate-600 rounded-md shadow-sm py-2 px-3 text-slate-300"></div><div><label class="text-sm font-medium text-slate-400">Role</label><input id="setting-user-role" type="text" disabled class="mt-1 block w-full bg-slate-700 border border-slate-600 rounded-md shadow-sm py-2 px-3 text-slate-300"></div></div></div><div><h4 class="text-lg font-medium text-slate-200 mb-4 border-b border-slate-700 pb-2">Notification Settings</h4><div class="space-y-4"><div class="flex items-center justify-between p-4 border border-transparent rounded-lg"><div><p class="font-semibold text-slate-100">Email on Critical DLP Incidents</p><p class="text-sm text-slate-400">Receive an email alert for any incident marked as 'Critical'.</p></div><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="setting-notif-dlp" class="sr-only peer"><div class="w-11 h-6 bg-slate-600 rounded-full peer peer-focus:ring-4 peer-focus:ring-blue-800 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div></label></div><div class="flex items-center justify-between p-4 border border-transparent rounded-lg"><div><p class="font-semibold text-slate-100">Email on High-Severity Threats</p><p class="text-sm text-slate-400">Receive an email alert for threats like 'Impossible Travel'.</p></div><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="setting-notif-threat" class="sr-only peer"><div class="w-11 h-6 bg-slate-600 rounded-full peer peer-focus:ring-4 peer-focus:ring-blue-800 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div></label></div></div></div><div class="mt-8 pt-4 border-t border-slate-700 text-right"><button onclick="confirmSaveSettings()" class="bg-blue-600 text-white font-semibold px-4 py-2 rounded-md hover:bg-blue-700 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 focus:ring-blue-500">Save Changes</button></div></div></div>
+            <div id="users-view" class="hidden"><div class="bg-slate-800 p-6 rounded-xl shadow-lg border border-slate-700"><div class="flex justify-between items-center mb-4"><h3 class="font-semibold text-xl text-slate-100">User Management</h3><button onclick="openModal('add-user-modal')" class="bg-blue-600 text-white font-semibold px-4 py-2 rounded-md hover:bg-blue-700 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 focus:ring-blue-500">Add User</button></div><p class="text-slate-400 mb-6">Manage users and their access to the CASB portal.</p><div class="overflow-x-auto"><table class="w-full text-left"><thead><tr class="border-b border-slate-700"><th class="p-4 font-semibold text-slate-100">Name</th><th class="p-4 font-semibold text-slate-100">Email</th><th class="p-4 font-semibold text-slate-100">Role</th><th class="p-4 font-semibold text-slate-100">Status</th><th class="p-4 font-semibold text-center text-slate-100">Actions</th></tr></thead><tbody id="users-table"></tbody></table></div></div></div>
+            <div id="services-view" class="hidden"><div class="bg-slate-800 p-6 rounded-xl shadow-lg border border-slate-700"><h3 class="font-semibold mb-4 text-xl text-slate-100">Service Connectors</h3><p class="text-slate-400 mb-6">Connect and manage your cloud services to enable monitoring and policy enforcement.</p><div id="services-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div></div></div>
+            <div id="audit-view" class="hidden">
+                <div class="bg-slate-800 p-6 rounded-xl shadow-lg border border-slate-700">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="font-semibold text-xl text-slate-100">User Activity Audit Log</h3>
+                        <button onclick="simulateAnomaly()" class="bg-amber-600 text-white font-semibold px-4 py-2 rounded-md hover:bg-amber-700 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 focus:ring-amber-500">
+                           Simulate Anomaly
+                        </button>
+                    </div>
+                    <p class="text-slate-400 mb-6">A real-time stream of user events being collected for analysis.</p>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left">
+                            <thead>
+                                <tr class="border-b border-slate-700">
+                                    <th class="p-4 font-semibold text-slate-100">Timestamp</th>
+                                    <th class="p-4 font-semibold text-slate-100">User</th>
+                                    <th class="p-4 font-semibold text-slate-100">Action</th>
+                                    <th class="p-4 font-semibold text-slate-100">Details</th>
+                                </tr>
+                            </thead>
+                            <tbody id="audit-table"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:3000/api';
+
+        // --- RENDER FUNCTIONS ---
+        function renderShadowITTable(apps) {
+            const tableBody = document.getElementById('shadow-it-table');
+            if (!apps || apps.length === 0) {
+                tableBody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-slate-400">No applications found.</td></tr>`;
+                return;
+            }
+            tableBody.innerHTML = apps.map(app => {
+                const riskColor = app.risk === 'High' ? 'text-red-400' : app.risk === 'Medium' ? 'text-amber-400' : 'text-green-400';
+                const statusBadge = app.status === 'Sanctioned' 
+                    ? `<span class="bg-green-900/50 text-green-300 text-xs font-medium mr-2 px-2.5 py-0.5 rounded-full border border-green-500/30">${app.status}</span>`
+                    : `<span class="bg-slate-700 text-slate-300 text-xs font-medium mr-2 px-2.5 py-0.5 rounded-full border border-slate-500/30">${app.status}</span>`;
+                const actionButtonText = app.status === 'Sanctioned' ? 'Unsanction' : 'Sanction';
+                const actionButtonColor = app.status === 'Sanctioned' ? 'bg-red-500 hover:bg-red-600' : 'bg-green-500 hover:bg-green-600';
+                return `
+                    <tr class="border-b border-slate-800 hover:bg-slate-700/50 transition-colors">
+                        <td class="p-4 font-medium text-slate-100">${app.name}</td>
+                        <td class="p-4 text-slate-400">${app.category}</td>
+                        <td class="p-4 font-semibold ${riskColor}">${app.risk}</td>
+                        <td class="p-4 text-slate-400">${app.users}</td>
+                        <td class="p-4">${statusBadge}</td>
+                        <td class="p-4 text-center">
+                            <button onclick="confirmToggleAppStatus(${app.id}, '${app.name.replace(/'/g, "\\'")}', '${app.status}')" class="${actionButtonColor} text-white px-3 py-1 rounded-md text-sm transition-colors">${actionButtonText}</button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+        function renderDLPTable(incidents) {
+             const tableBody = document.getElementById('dlp-table');
+            if (!incidents || incidents.length === 0) {
+                tableBody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-slate-400">No DLP incidents found.</td></tr>`;
+                return;
+            }
+            tableBody.innerHTML = incidents.map(incident => {
+                const severityColor = incident.severity === 'Critical' ? 'bg-red-500' : incident.severity === 'High' ? 'bg-orange-500' : 'bg-amber-500';
+                return `
+                    <tr class="border-b border-slate-800 hover:bg-slate-700/50 transition-colors">
+                        <td class="p-4 text-slate-400">${new Date(incident.ts).toLocaleString()}</td>
+                        <td class="p-4 font-medium text-slate-100">${incident.user}</td>
+                        <td class="p-4 text-slate-400">${incident.policy}</td>
+                        <td class="p-4 text-slate-400">${incident.app}</td>
+                        <td class="p-4 text-slate-100"><span class="inline-block w-3 h-3 rounded-full mr-2 ${severityColor}"></span>${incident.severity}</td>
+                        <td class="p-4 font-medium text-slate-100">${incident.action}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+        function renderThreatsTable(threats) {
+            const tableBody = document.getElementById('threats-table');
+            if (!threats || threats.length === 0) {
+                tableBody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-slate-400">No threats found.</td></tr>`;
+                return;
+            }
+            tableBody.innerHTML = threats.map(threat => {
+                const isML = threat.details.startsWith('ML Model:');
+                const mlBadge = isML ? `<span class="ml-2 bg-purple-900/50 text-purple-300 text-xs font-medium px-2.5 py-0.5 rounded-full border border-purple-500/30">ML</span>` : '';
+                const statusBadge = threat.status === 'Remediated' ? 'bg-green-900/50 text-green-300 border-green-500/30' 
+                    : threat.status === 'Blocked' ? 'bg-red-900/50 text-red-300 border-red-500/30'
+                    : 'bg-blue-900/50 text-blue-300 border-blue-500/30';
+                return `
+                    <tr class="border-b border-slate-800 hover:bg-slate-700/50 transition-colors">
+                        <td class="p-4 text-slate-400">${new Date(threat.ts).toLocaleString()}</td>
+                        <td class="p-4 font-medium text-slate-100 flex items-center">${threat.type}${mlBadge}</td>
+                        <td class="p-4 text-slate-400">${threat.user}</td>
+                        <td class="p-4 text-slate-400">${threat.ip}</td>
+                        <td class="p-4 text-slate-400">${threat.details}</td>
+                        <td class="p-4"><span class="text-xs font-medium px-2.5 py-0.5 rounded-full border ${statusBadge}">${threat.status}</span></td>
+                    </tr>
+                `;
+            }).join('');
+        }
+        function renderPoliciesList(policies) {
+             const listContainer = document.getElementById('policies-list');
+             if (!policies || policies.length === 0) {
+                listContainer.innerHTML = `<p class="text-center text-slate-400">No policies configured.</p>`;
+                return;
+            }
+            listContainer.innerHTML = policies.map(policy => `
+                <div class="flex items-center justify-between p-4 border border-slate-700 rounded-lg bg-slate-800/50 hover:bg-slate-700/50 transition-colors">
+                    <div>
+                        <p class="font-semibold text-slate-100">${policy.name}</p>
+                        <p class="text-sm text-slate-400">${policy.category}</p>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" ${policy.enabled ? 'checked' : ''} class="sr-only peer" onchange="togglePolicy('${policy.id}')">
+                        <div class="w-11 h-6 bg-slate-600 rounded-full peer peer-focus:ring-4 peer-focus:ring-blue-800 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                    </label>
+                </div>
+            `).join('');
+        }
+        function renderSettings(settings) {
+            document.getElementById('setting-user-name').value = settings.user.name;
+            document.getElementById('setting-user-email').value = settings.user.email;
+            document.getElementById('setting-user-role').value = settings.user.role;
+            document.getElementById('setting-notif-dlp').checked = settings.notifications.emailOnCriticalDLP;
+            document.getElementById('setting-notif-threat').checked = settings.notifications.emailOnHighThreat;
+        }
+        function renderUsersTable(users) {
+            const tableBody = document.getElementById('users-table');
+            if (!users || users.length === 0) { tableBody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-slate-400">No users found.</td></tr>`; return; }
+            tableBody.innerHTML = users.map((user, index) => {
+                const statusBadge = user.status === 'Active' ? `<span class="bg-green-900/50 text-green-300 text-xs font-medium px-2.5 py-0.5 rounded-full border border-green-500/30">Active</span>` : `<span class="bg-slate-700 text-slate-300 text-xs font-medium px-2.5 py-0.5 rounded-full border border-slate-500/30">Inactive</span>`;
+                const toggleButtonText = user.status === 'Active' ? 'Deactivate' : 'Activate';
+                return `
+                    <tr class="border-b border-slate-800 hover:bg-slate-700/50 table-row-animate" style="animation-delay: ${index * 50}ms">
+                        <td class="p-4 font-medium text-slate-100">${user.name}</td>
+                        <td class="p-4 text-slate-400">${user.email}</td>
+                        <td class="p-4 text-slate-400">${user.role}</td>
+                        <td class="p-4">${statusBadge}</td>
+                        <td class="p-4 text-center text-sm space-x-2">
+                           <button onclick="confirmToggleUserStatus(${user.id}, '${user.name.replace(/'/g, "\\'")}', '${user.status}')" class="text-slate-400 hover:text-white transition-colors p-1">${toggleButtonText}</button>
+                           <button onclick="confirmDeleteUser(${user.id}, '${user.name.replace(/'/g, "\\'")}')" class="text-red-400 hover:text-red-300 transition-colors p-1">Delete</button>
+                        </td>
+                    </tr>`;
+            }).join('');
+        }
+        function renderServicesGrid(services) {
+            const grid = document.getElementById('services-grid');
+            if (!services || services.length === 0) { grid.innerHTML = `<p class="text-center text-slate-400 col-span-full">No services found.</p>`; return; }
+            grid.innerHTML = services.map((service, index) => {
+                const isConnected = service.status === 'Connected';
+                const statusBadge = isConnected ? `<div class="absolute top-4 right-4 text-xs flex items-center text-green-300"><span class="w-2 h-2 bg-green-400 rounded-full mr-1.5"></span>Connected</div>` : `<div class="absolute top-4 right-4 text-xs flex items-center text-slate-400"><span class="w-2 h-2 bg-slate-500 rounded-full mr-1.5"></span>Disconnected</div>`;
+                const actionButtonText = isConnected ? 'Disconnect' : 'Connect';
+                const actionButtonColor = isConnected ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700';
+                return `
+                    <div class="bg-slate-800/50 p-6 rounded-xl shadow-lg border border-slate-700 relative fade-slide-in" style="animation-delay: ${index * 100}ms">
+                        ${statusBadge}
+                        <h4 class="text-lg font-bold text-slate-100">${service.name}</h4>
+                        <p class="text-sm text-slate-400">${service.type}</p>
+                         <button onclick="confirmToggleServiceStatus('${service.id}', '${service.name.replace(/'/g, "\\'")}', '${service.status}')" class="w-full mt-4 ${actionButtonColor} text-white font-semibold py-2 rounded-md transition-colors">${actionButtonText}</button>
+                    </div>`;
+            }).join('');
+        }
+        function renderAuditLog(events) {
+            const tableBody = document.getElementById('audit-table');
+            if (!events || events.length === 0) {
+                tableBody.innerHTML = `<tr><td colspan="4" class="p-4 text-center text-slate-400">No events in log.</td></tr>`;
+                return;
+            }
+            tableBody.innerHTML = events.map((event, index) => `
+                <tr class="border-b border-slate-800 hover:bg-slate-700/50 table-row-animate" style="animation-delay: ${index * 30}ms">
+                    <td class="p-4 text-slate-400 text-sm">${new Date(event.ts).toLocaleString()}</td>
+                    <td class="p-4 font-medium text-slate-100">${event.user}</td>
+                    <td class="p-4 text-slate-400">${event.action}</td>
+                    <td class="p-4 text-slate-400 text-sm"><pre class="bg-slate-900/50 p-2 rounded text-xs"><code>${JSON.stringify(event.details, null, 2)}</code></pre></td>
+                </tr>
+            `).join('');
+        }
+
+        // --- DATA FETCHING & STATE ---
+        async function fetchAndRenderAllData() {
+            const connectingOverlay = document.getElementById('connecting-overlay');
+            const errorOverlay = document.getElementById('connection-error-overlay');
+            connectingOverlay.classList.remove('hidden');
+            errorOverlay.classList.add('hidden');
+            try {
+                const [statsRes, shadowITRes, dlpRes, threatsRes, policiesRes] = await Promise.all([
+                    fetch(`${API_BASE_URL}/stats`), fetch(`${API_BASE_URL}/shadow-it`),
+                    fetch(`${API_BASE_URL}/dlp-incidents`), fetch(`${API_BASE_URL}/threats`),
+                    fetch(`${API_BASE_URL}/policies`)
+                ]);
+                const responses = [statsRes, shadowITRes, dlpRes, threatsRes, policiesRes];
+                if (responses.some(res => !res.ok)) { throw new Error('Network response was not ok'); }
+                const [stats, shadowIT, dlpIncidents, threats, policies] = await Promise.all(responses.map(r => r.json()));
+                
+                connectingOverlay.classList.add('hidden');
+                updateDashboardStats(stats);
+                renderShadowITTable(shadowIT);
+                renderDLPTable(dlpIncidents);
+                renderThreatsTable(threats);
+                renderPoliciesList(policies);
+                renderCharts(dlpIncidents, shadowIT);
+            } catch (error) {
+                console.error("Failed to fetch data:", error);
+                connectingOverlay.classList.add('hidden');
+                errorOverlay.classList.remove('hidden');
+            }
+        }
+        function retryConnection() { fetchAndRenderAllData(); }
+        async function fetchAndRenderSettings() {
+             try {
+                const res = await fetch(`${API_BASE_URL}/settings`);
+                if (!res.ok) throw new Error('Failed to fetch settings');
+                const settings = await res.json();
+                renderSettings(settings);
+            } catch (error) {
+                console.error(error);
+            }
+        }
+        async function fetchAndRenderUsers() {
+            try { 
+                const res = await fetch(`${API_BASE_URL}/users`); 
+                if (!res.ok) throw new Error('Failed to fetch users'); 
+                const users = await res.json(); 
+                renderUsersTable(users); 
+            } catch(e){ console.error(e); }
+        }
+        async function fetchAndRenderServices() {
+            try { 
+                const res = await fetch(`${API_BASE_URL}/services`); 
+                if (!res.ok) throw new Error('Failed to fetch services'); 
+                const services = await res.json(); 
+                renderServicesGrid(services); 
+            } catch(e){ console.error(e); }
+        }
+        async function fetchAndRenderAuditLog() {
+            try {
+                const res = await fetch(`${API_BASE_URL}/events`);
+                if (!res.ok) throw new Error('Failed to fetch audit log');
+                const events = await res.json();
+                renderAuditLog(events);
+            } catch (e) { console.error(e); }
+        }
+
+        // --- CONFIRMATION & ACTION HANDLERS ---
+        function confirmToggleAppStatus(appId, appName, currentStatus) {
+            const action = currentStatus === 'Sanctioned' ? 'unsanction' : 'sanction';
+            showConfirmationModal(
+                `Confirm Action`,
+                `Are you sure you want to ${action} the application "${appName}"?`,
+                () => toggleAppStatus(appId, appName, action),
+                action === 'unsanction' ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'
+            );
+        }
+        async function toggleAppStatus(appId, appName, action) {
+            try {
+                const res = await fetch(`${API_BASE_URL}/shadow-it/${appId}/toggle-status`, { method: 'POST' });
+                if (!res.ok) throw new Error('API request failed');
+                showToast(`Successfully ${action}ed ${appName}.`, 'success');
+                const updatedAppsRes = await fetch(`${API_BASE_URL}/shadow-it`);
+                const updatedApps = await updatedAppsRes.json();
+                renderShadowITTable(updatedApps);
+            } catch (error) {
+                console.error(`Failed to ${action} app:`, error);
+                showToast(`Error: Could not ${action} the app.`, 'error');
+            }
+        }
+
+        function confirmDeleteUser(userId, userName) {
+            showConfirmationModal(
+                `Delete User`,
+                `Are you sure you want to permanently delete the user "${userName}"? This action cannot be undone.`,
+                () => deleteUser(userId, userName),
+                'bg-red-600 hover:bg-red-700'
+            );
+        }
+        async function deleteUser(userId, userName) {
+            try {
+                const res = await fetch(`${API_BASE_URL}/users/${userId}`, { method: 'DELETE' });
+                if (!res.ok) throw new Error('API request failed');
+                showToast(`User "${userName}" deleted.`, 'success');
+                fetchAndRenderUsers();
+            } catch (error) {
+                console.error(`Failed to delete user:`, error);
+                showToast(`Error: Could not delete user.`, 'error');
+            }
+        }
+
+        function confirmToggleUserStatus(userId, userName, currentStatus) {
+            const action = currentStatus === 'Active' ? 'deactivate' : 'activate';
+            showConfirmationModal(
+                `Confirm User Status Change`,
+                `Are you sure you want to ${action} the user "${userName}"?`,
+                () => toggleUserStatus(userId, action),
+                 action === 'deactivate' ? 'bg-amber-600 hover:bg-amber-700' : 'bg-blue-600 hover:bg-blue-700'
+            );
+        }
+        async function toggleUserStatus(userId, action) {
+            try {
+                const res = await fetch(`${API_BASE_URL}/users/${userId}/toggle-status`, { method: 'POST' });
+                if (!res.ok) throw new Error('API request failed');
+                showToast(`User successfully ${action}d.`, 'success');
+                fetchAndRenderUsers();
+            } catch (error) {
+                console.error(`Failed to ${action} user:`, error);
+                showToast(`Error: Could not ${action} user.`, 'error');
+            }
+        }
+        
+        function confirmToggleServiceStatus(serviceId, serviceName, currentStatus) {
+            const action = currentStatus === 'Connected' ? 'disconnect' : 'connect';
+             showConfirmationModal(
+                `Confirm Service Connection`,
+                `Are you sure you want to ${action} the service "${serviceName}"?`,
+                () => toggleServiceStatus(serviceId, action),
+                action === 'disconnect' ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'
+            );
+        }
+        async function toggleServiceStatus(serviceId, action) {
+            try {
+                const res = await fetch(`${API_BASE_URL}/services/${serviceId}/toggle-status`, { method: 'POST' });
+                if (!res.ok) throw new Error('API request failed');
+                showToast(`Service successfully ${action}ed.`, 'success');
+                fetchAndRenderServices();
+            } catch (error) {
+                console.error(`Failed to ${action} service:`, error);
+                showToast(`Error: Could not ${action} service.`, 'error');
+            }
+        }
+        
+        function confirmSaveSettings() {
+             showConfirmationModal(
+                `Save Settings`,
+                `Are you sure you want to save these changes?`,
+                () => saveSettings()
+            );
+        }
+        async function saveSettings() {
+             const saveBtn = document.querySelector('#settings-view button');
+             const originalText = saveBtn.textContent;
+             saveBtn.disabled = true;
+             saveBtn.textContent = 'Saving...';
+             const newSettings = { notifications: { emailOnCriticalDLP: document.getElementById('setting-notif-dlp').checked, emailOnHighThreat: document.getElementById('setting-notif-threat').checked } };
+             try {
+                const res = await fetch(`${API_BASE_URL}/settings`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newSettings) });
+                if (!res.ok) throw new Error('Failed to save settings');
+                showToast('Settings saved successfully', 'success');
+                saveBtn.textContent = 'Saved!';
+             } catch (error) { console.error(error); showToast('Failed to save settings', 'error'); saveBtn.textContent = 'Error!'; }
+             finally { setTimeout(() => { saveBtn.textContent = originalText; saveBtn.disabled = false; }, 2000); }
+        }
+
+        async function simulateAnomaly() {
+            try {
+                const res = await fetch(`${API_BASE_URL}/simulate-anomaly`, { method: 'POST' });
+                if (!res.ok) throw new Error('Failed to simulate anomaly');
+                showToast('Anomaly event created successfully!', 'success');
+                fetchAndRenderAuditLog();
+            } catch(e) {
+                console.error(e);
+                showToast('Failed to simulate anomaly', 'error');
+            }
+        }
+        async function addUser(event) {
+            event.preventDefault();
+            const form = event.target;
+            const newUser = { name: form.name.value, email: form.email.value, role: form.role.value };
+            try {
+                const res = await fetch(`${API_BASE_URL}/users`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newUser) });
+                if (!res.ok) throw new Error('Failed to add user');
+                showToast('User added successfully', 'success');
+                fetchAndRenderUsers();
+                closeModal('add-user-modal');
+            } catch (error) { console.error(error); showToast('Failed to add user', 'error'); }
+        }
+        async function togglePolicy(policyId) {
+             try {
+                await fetch(`${API_BASE_URL}/policies/${policyId}/toggle-status`, { method: 'POST' });
+                const statsRes = await fetch(`${API_BASE_URL}/stats`); const stats = await statsRes.json();
+                updateDashboardStats(stats);
+                showToast('Policy updated');
+             } catch (error) { console.error("Failed to toggle policy status:", error); showToast('Failed to update policy', 'error');}
+        }
+        
+        // --- UI UTILS ---
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            const colors = { success: 'bg-green-600 text-white', error: 'bg-red-600 text-white', info: 'bg-slate-700 text-slate-100' };
+            toast.className = `toast ${colors[type]}`;
+            toast.textContent = message;
+            container.appendChild(toast);
+            setTimeout(() => toast.classList.add('show'), 10);
+            setTimeout(() => { toast.classList.remove('show'); setTimeout(() => toast.remove(), 400); }, 3000);
+        }
+        function openModal(modalId) {
+            const modal = document.getElementById(modalId);
+            const modalContent = modal.querySelector('.modal-content');
+            modal.classList.remove('hidden');
+            setTimeout(() => { modalContent.classList.add('show'); }, 10);
+        }
+        function closeModal(modalId) {
+            const modal = document.getElementById(modalId);
+            const modalContent = modal.querySelector('.modal-content');
+            modalContent.classList.remove('show');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+                if (modalId === 'add-user-modal') document.getElementById('add-user-form').reset();
+            }, 300);
+        }
+        function showConfirmationModal(title, message, onConfirm, confirmButtonClass = 'bg-blue-600 hover:bg-blue-700') {
+            document.getElementById('confirm-title').textContent = title;
+            document.getElementById('confirm-message').textContent = message;
+            const confirmBtn = document.getElementById('confirm-button');
+            confirmBtn.className = `text-white font-semibold px-4 py-2 rounded-md transition-colors ${confirmButtonClass}`;
+            
+            const newConfirmBtn = confirmBtn.cloneNode(true);
+            confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
+            
+            newConfirmBtn.addEventListener('click', () => {
+                onConfirm();
+                closeModal('confirmation-modal');
+            });
+
+            openModal('confirmation-modal');
+        }
+
+        // --- PAGE NAVIGATION ---
+        const views = ['dashboard', 'shadow-it', 'dlp', 'threats', 'policies', 'settings', 'users', 'services', 'audit'];
+        const navLinks = views.map(id => document.getElementById(`nav-${id}`));
+        const viewElements = views.map(id => document.getElementById(`${id}-view`));
+        const pageTitle = document.getElementById('page-title');
+
+        function showView(viewId) {
+            viewElements.forEach(view => view && view.classList.add('hidden'));
+            document.getElementById(`${viewId}-view`).classList.remove('hidden');
+            navLinks.forEach(link => link && link.classList.remove('bg-blue-600/30', 'text-white'));
+            document.getElementById(`nav-${viewId}`).classList.add('bg-blue-600/30', 'text-white');
+            pageTitle.textContent = document.getElementById(`nav-${viewId}`).querySelector('span').textContent;
+            
+            if (viewId === 'settings') fetchAndRenderSettings();
+            if (viewId === 'users') fetchAndRenderUsers();
+            if (viewId === 'services') fetchAndRenderServices();
+            if (viewId === 'audit') fetchAndRenderAuditLog();
+        }
+
+        navLinks.forEach((link, index) => {
+            if (link) { link.addEventListener('click', (e) => { e.preventDefault(); showView(views[index]); }); }
+        });
+
+        // --- CHARTS ---
+        let dlpChartInstance, appRiskChartInstance;
+        function renderCharts(dlpIncidents, shadowITApps) {
+            if (!dlpIncidents || !shadowITApps) return;
+            Chart.defaults.color = '#94a3b8';
+            Chart.defaults.borderColor = '#334155';
+            
+            const dlpCtx = document.getElementById('dlpChart').getContext('2d');
+            const dlpSeverityCounts = dlpIncidents.reduce((acc, curr) => {
+                acc[curr.severity] = (acc[curr.severity] || 0) + 1; return acc;
+            }, {});
+
+            if (dlpChartInstance) dlpChartInstance.destroy();
+            dlpChartInstance = new Chart(dlpCtx, {
+                type: 'bar',
+                data: {
+                    labels: Object.keys(dlpSeverityCounts),
+                    datasets: [{
+                        label: 'Incidents', data: Object.values(dlpSeverityCounts),
+                        backgroundColor: ['#ef4444', '#f97316', '#f59e0b'],
+                        borderRadius: 5, borderWidth: 0,
+                    }]
+                },
+                options: {
+                    responsive: true, plugins: { legend: { display: false } },
+                    scales: {  y: { beginAtZero: true, grid: { color: '#334155' } }, x: { grid: { display: false } } }
+                }
+            });
+
+            const appRiskCtx = document.getElementById('appRiskChart').getContext('2d');
+            const appRiskCounts = shadowITApps.reduce((acc, curr) => {
+                acc[curr.risk] = (acc[curr.risk] || 0) + 1; return acc;
+            }, {});
+
+            if (appRiskChartInstance) appRiskChartInstance.destroy();
+            appRiskChartInstance = new Chart(appRiskCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: Object.keys(appRiskCounts),
+                    datasets: [{
+                        data: Object.values(appRiskCounts),
+                        backgroundColor: ['#b91c1c', '#d97706', '#16a34a'],
+                        borderColor: '#1e293b', borderWidth: 4,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: { legend: { position: 'bottom', labels: { color: '#94a3b8' } } }
+                }
+            });
+        }
+        
+        // --- INITIALIZATION ---
+        function updateDashboardStats(stats) {
+            if (!stats) return;
+            document.getElementById('discovered-apps-count').textContent = stats.discoveredApps;
+            document.getElementById('dlp-incidents-count').textContent = stats.dlpIncidents;
+            document.getElementById('threats-detected-count').textContent = stats.threatsDetected;
+            document.getElementById('active-policies-count').textContent = stats.activePolicies;
+            document.getElementById('managed-users-count').textContent = stats.managedUsers;
+            document.getElementById('connected-services-count').textContent = stats.connectedServices;
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchAndRenderAllData();
+            document.getElementById('add-user-form').addEventListener('submit', (e) => {
+                e.preventDefault();
+                showConfirmationModal('Add User', 'Are you sure you want to add this new user?', () => addUser(e));
+            });
+        });
+    </script>
+</body>
+</html>
+
